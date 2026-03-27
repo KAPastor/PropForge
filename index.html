@@ -274,10 +274,18 @@
       </div>
 
       <div class="row">
-        <div class="row-lbl">Pitch <span class="v" id="v-pitch">100</span></div>
+        <div class="row-lbl">Root Pitch <span class="v" id="v-pitch">100</span></div>
         <div class="row-in">
           <input type="range"  id="p-pitch" min="30"  max="350" value="100" step="5"   oninput="sync('pitch');rebuild()">
           <input type="number" id="n-pitch" value="100" min="30" max="350"  onchange="syncR('pitch');rebuild()">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-lbl">Tip Pitch <span class="v" id="v-pitchtip">100</span></div>
+        <div class="row-in">
+          <input type="range"  id="p-pitchtip" min="30"  max="350" value="100" step="5"   oninput="sync('pitchtip');rebuild()">
+          <input type="number" id="n-pitchtip" value="100" min="30" max="350"  onchange="syncR('pitchtip');rebuild()">
         </div>
       </div>
 
@@ -557,7 +565,7 @@ function addSupportPost(tris, cx, cz, yBot, yTop, nSides, bodyR, snapR, snapH) {
 
 /** Build one blade — returns flat {pos[], nor[]} triangle arrays. */
 function buildBlade(p, bladeAngle) {
-  const { outerR, hubR, pitch, rootChord, tipChord,
+  const { outerR, hubR, pitch, tipPitch, rootChord, tipChord,
           tRatio, minWall, nRadial, nHalf, cw, hubH } = p;
 
   const betaRoot = Math.atan2(pitch, 2 * Math.PI * hubR);
@@ -583,7 +591,8 @@ function buildBlade(p, bladeAngle) {
   for (let i = 0; i <= nRadial; i++) {
     const t     = i / nRadial;
     const r     = hubR + t * (outerR - hubR);
-    const beta  = Math.atan2(pitch, 2 * Math.PI * r);
+    const pitchAtR = pitch + t * (tipPitch - pitch);  // interpolate root→tip pitch
+    const beta  = Math.atan2(pitchAtR, 2 * Math.PI * r);
     const chord = rootChord + t * (tipChord - rootChord);
     const minH  = (minWall / chord) * 0.5;   // per-side normalised min
 
@@ -849,6 +858,7 @@ function getParams() {
   return {
     diam, hubD, hubH,
     pitch:     gv('p-pitch'),
+    tipPitch:  gv('p-pitchtip'),
     rootChord: gv('p-rootc'),
     tipChord:  gv('p-tipc'),
     thick:     gv('p-thick'),
@@ -874,7 +884,8 @@ function rebuild() {
 
   // Update labels
   lbl('diam',  p.diam     + ' mm');
-  lbl('pitch', p.pitch    + ' mm');
+  lbl('pitch',    p.pitch    + ' mm');
+  lbl('pitchtip', p.tipPitch + ' mm');
   lbl('rootc', p.rootChord + ' mm');
   lbl('tipc',  p.tipChord  + ' mm');
   lbl('hubd',  p.hubD     + ' mm');
