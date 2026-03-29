@@ -203,6 +203,9 @@
     .mode-icon { font-size:20px; }
     .mode-name { font-size:12px; font-weight:700; color:var(--text); }
     .mode-sub  { font-size:10px; color:var(--muted); }
+    .btn-secondary { background:var(--bg); color:var(--text); border:1.5px solid var(--border); }
+    .btn-secondary:hover { border-color:var(--blue); color:var(--blue); }
+    .btn-secondary.sim-active { background:#ecfdf5; border-color:var(--green); color:#059669; }
   </style>
   <!-- Vercel Analytics -->
   <script defer src="/_vercel/insights/script.js"></script>
@@ -228,6 +231,7 @@
   <div class="badge">BLDC</div>
   <span class="hdr-note">3D Printable Propeller Designer</span>
   <div class="spacer"></div>
+  <button id="btn-sim" class="btn btn-secondary" onclick="toggleSim()">&#9654; Simulate</button>
   <button class="btn btn-primary" onclick="exportSTL()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
          stroke-linecap="round" stroke-linejoin="round">
@@ -484,6 +488,22 @@
           <input type="range"  id="p-supcount" min="2" max="8" value="4" step="1" oninput="sync('supcount');rebuild()">
           <input type="number" id="n-supcount" value="4" min="2" max="8" onchange="syncR('supcount');rebuild()">
         </div>
+      </div>
+    </div>
+
+    <!-- Simulation -->
+    <div class="group" id="sim-group">
+      <div class="group-title">Simulation</div>
+      <div class="row">
+        <div class="row-lbl">RPM <span class="v" id="v-rpm">3000</span></div>
+        <div class="row-in">
+          <input type="range"  id="p-rpm" min="500" max="20000" value="3000" step="100" oninput="sync('rpm');updateSim()">
+          <input type="number" id="n-rpm" value="3000" min="500" max="20000" step="100"  onchange="syncR('rpm');updateSim()">
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-lbl">Est. Thrust</div>
+        <div style="font-size:13px;font-weight:700;color:var(--green)" id="s-thrust">— N &nbsp; (— g)</div>
       </div>
     </div>
 
@@ -859,6 +879,11 @@ function buildHub(hubR, hubH, boreR, nSeg, threadOn, threadRH, threadPitch, thre
 let renderer, scene, camera, controls, propMesh, hubMesh;
 let stlPositions = null;   // saved for STL export
 let cameraLocked = false;  // true after first user orbit — disables auto-fit
+let propGroup = null;   // Three.js Group — contains propMesh + hubMesh so we can spin them
+let thrustArrow = null; // ArrowHelper pointing in thrust direction
+let simulating  = false;
+let propCW      = false;  // updated by rebuild(), read by animation loop
+let lastParams  = null;   // latest params, used by updateSim()
 
 function initThree() {
   const canvas = document.getElementById('canvas');
@@ -890,9 +915,36 @@ function initThree() {
   grid.position.y = -0.5;
   scene.add(grid);
 
+  // Prop group — children spin as a unit in simulation mode
+  propGroup = new THREE.Group();
+  scene.add(propGroup);
+
+  // Thrust force arrow (hidden until simulation starts)
+  const arrowDir = new THREE.Vector3(0, 1, 0);
+  const arrowOri = new THREE.Vector3(0, 0, 0);
+  thrustArrow = new THREE.ArrowHelper(arrowDir, arrowOri, 60, 0x10b981, 14, 7);
+  thrustArrow.visible = false;
+  scene.add(thrustArrow);
+
   onResize();
   window.addEventListener('resize', onResize);
-  (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+
+  let prevTime = performance.now();
+  (function loop() {
+    requestAnimationFrame(loop);
+    const now = performance.now();
+    const dt  = Math.min((now - prevTime) / 1000, 0.05);  // seconds, cap at 50ms
+    prevTime  = now;
+
+    if (simulating && propGroup) {
+      const rpm   = parseFloat(document.getElementById('p-rpm').value) || 3000;
+      const omega = (rpm / 60) * 2 * Math.PI;  // rad/s
+      propGroup.rotation.y += omega * dt * (propCW ? -1 : 1);
+    }
+
+    controls.update();
+    renderer.render(scene, camera);
+  })();
 }
 
 function onResize() {
@@ -988,9 +1040,9 @@ function rebuild() {
   bladeGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(allPos), 3));
   bladeGeo.setAttribute('normal',   new THREE.BufferAttribute(new Float32Array(allNor), 3));
 
-  if (propMesh) { scene.remove(propMesh); propMesh.geometry.dispose(); propMesh.material.dispose(); }
+  if (propMesh) { propGroup.remove(propMesh); propMesh.geometry.dispose(); propMesh.material.dispose(); }
   propMesh = new THREE.Mesh(bladeGeo, bladeMat);
-  scene.add(propMesh);
+  propGroup.add(propMesh);
 
   // ── Hub mesh (transparent when threads on so bore is visible) ───
   const hubGeo = new THREE.BufferGeometry();
@@ -1003,9 +1055,9 @@ function rebuild() {
     opacity: p.threadOn ? 0.45 : 1.0,
     depthWrite: !p.threadOn,
   });
-  if (hubMesh) { scene.remove(hubMesh); hubMesh.geometry.dispose(); hubMesh.material.dispose(); }
+  if (hubMesh) { propGroup.remove(hubMesh); hubMesh.geometry.dispose(); hubMesh.material.dispose(); }
   hubMesh = new THREE.Mesh(hubGeo, hubMat);
-  scene.add(hubMesh);
+  propGroup.add(hubMesh);
 
   // Tri count (combined)
   const triCount = stlPositions.length / 9;
@@ -1014,7 +1066,7 @@ function rebuild() {
 
   // Auto-fit camera — only on first build, not after user has orbited
   if (!cameraLocked) {
-    const box  = new THREE.Box3().setFromObject(propMesh);
+    const box  = new THREE.Box3().setFromObject(propGroup);
     const size = box.getSize(new THREE.Vector3()).length();
     const ctr  = box.getCenter(new THREE.Vector3());
     const dir  = camera.position.clone().sub(controls.target).normalize();
@@ -1022,6 +1074,10 @@ function rebuild() {
     camera.position.copy(ctr).addScaledVector(dir, size * 1.55);
     controls.update();
   }
+
+  propCW     = p.cw;
+  lastParams = p;
+  if (thrustArrow) updateSim();
 
   updateHints(p);
 }
@@ -1172,6 +1228,53 @@ function applyMode(mode) {
     document.getElementById('base-flat').checked = true;
   }
   rebuild();
+}
+
+// ─── Simulation ──────────────────────────────────────────────
+function estimateThrust(p, rpm) {
+  const n    = rpm / 60;                   // rev/s
+  const D    = p.diam   / 1000;            // metres
+  const pitR = p.pitch  / p.diam;          // pitch/diameter ratio
+  // Empirical thrust coefficient scaled for blade count and pitch ratio
+  const Ct   = (0.1 + 0.15 * pitR) * (p.blades / 3);
+  return Math.max(0, Ct * 1.225 * n * n * D * D * D * D); // Newtons
+}
+
+function updateSim() {
+  if (!lastParams) return;
+  const rpm    = parseFloat(document.getElementById('p-rpm').value) || 3000;
+  const thrust = estimateThrust(lastParams, rpm);
+  const grams  = (thrust / 9.81 * 1000).toFixed(0);
+  document.getElementById('s-thrust').textContent =
+    thrust.toFixed(2) + ' N \u00a0 (' + grams + ' g)';
+
+  // Update arrow: origin = hub top centre, length scales with thrust
+  if (thrustArrow) {
+    const hubH  = lastParams.hubH;
+    const maxLen = lastParams.outerR * 1.6;
+    const minLen = hubH + 8;
+    // Arrow length: 8mm/N + min, capped at maxLen
+    const len = Math.min(minLen + thrust * 8, maxLen);
+    thrustArrow.position.set(0, hubH, 0);
+    thrustArrow.setLength(len, Math.min(len * 0.22, 18), Math.min(len * 0.11, 9));
+  }
+}
+
+function toggleSim() {
+  simulating = !simulating;
+  const btn  = document.getElementById('btn-sim');
+  if (simulating) {
+    btn.textContent = '\u23F8 Stop';
+    btn.classList.add('sim-active');
+    if (thrustArrow) thrustArrow.visible = true;
+    controls.autoRotate = false;
+    updateSim();
+  } else {
+    btn.textContent = '\u25B6 Simulate';
+    btn.classList.remove('sim-active');
+    if (thrustArrow) thrustArrow.visible = false;
+    if (propGroup)   propGroup.rotation.y = 0;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
