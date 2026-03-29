@@ -1327,11 +1327,13 @@ function updateSim() {
   document.getElementById('sh-tip').textContent    = tipSpd.toFixed(1) + ' m/s';
   document.getElementById('sh-pitch').textContent  = pitchSpd.toFixed(1) + ' m/s';
 
-  // Thrust arrow — originates above prop disk, points downward (airflow direction)
+  // Thrust arrow — flips with spin direction
   if (thrustArrow) {
     const maxLen = p.outerR * 1.6;
     const len = Math.min(p.hubH + 8 + thrust * 8, maxLen);
-    thrustArrow.position.set(0, p.hubH + len, 0);
+    const dir = propCW ? 1 : -1;
+    thrustArrow.setDirection(new THREE.Vector3(0, dir, 0));
+    thrustArrow.position.set(0, dir < 0 ? p.hubH + len : -len, 0);
     thrustArrow.setLength(len, Math.min(len * 0.22, 18), Math.min(len * 0.11, 9));
   }
 }
