@@ -977,8 +977,8 @@ function initThree() {
   propGroup = new THREE.Group();
   scene.add(propGroup);
 
-  // Thrust force arrow (hidden until simulation starts)
-  const arrowDir = new THREE.Vector3(0, 1, 0);
+  // Thrust force arrow — points downward (airflow pushed down through prop disk)
+  const arrowDir = new THREE.Vector3(0, -1, 0);
   const arrowOri = new THREE.Vector3(0, 0, 0);
   thrustArrow = new THREE.ArrowHelper(arrowDir, arrowOri, 60, 0x10b981, 14, 7);
   thrustArrow.visible = false;
@@ -1327,11 +1327,11 @@ function updateSim() {
   document.getElementById('sh-tip').textContent    = tipSpd.toFixed(1) + ' m/s';
   document.getElementById('sh-pitch').textContent  = pitchSpd.toFixed(1) + ' m/s';
 
-  // Thrust arrow
+  // Thrust arrow — originates above prop disk, points downward (airflow direction)
   if (thrustArrow) {
     const maxLen = p.outerR * 1.6;
     const len = Math.min(p.hubH + 8 + thrust * 8, maxLen);
-    thrustArrow.position.set(0, p.hubH, 0);
+    thrustArrow.position.set(0, p.hubH + len, 0);
     thrustArrow.setLength(len, Math.min(len * 0.22, 18), Math.min(len * 0.11, 9));
   }
 }
