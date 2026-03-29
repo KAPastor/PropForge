@@ -192,6 +192,17 @@
       padding:6px 12px; font-size:.7rem; color:var(--muted);
       pointer-events:none;
     }
+    .mode-btns { display:flex; gap:8px; padding:10px 14px; }
+    .mode-btn {
+      flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;
+      padding:10px 6px; border-radius:10px; border:2px solid var(--border);
+      background:var(--bg); cursor:pointer; transition:all .15s;
+    }
+    .mode-btn:hover { border-color:var(--blue); }
+    .mode-btn.mode-active { border-color:var(--blue); background:#eff6ff; }
+    .mode-icon { font-size:20px; }
+    .mode-name { font-size:12px; font-weight:700; color:var(--text); }
+    .mode-sub  { font-size:10px; color:var(--muted); }
   </style>
   <!-- Vercel Analytics -->
   <script defer src="/_vercel/insights/script.js"></script>
@@ -238,6 +249,23 @@
       <div class="stat"><div class="stat-v" id="s-diam">—</div><div class="stat-l">Diameter</div></div>
       <div class="stat"><div class="stat-v" id="s-pitch">—</div><div class="stat-l">Pitch</div></div>
       <div class="stat"><div class="stat-v" id="s-tris">—</div><div class="stat-l">Triangles</div></div>
+    </div>
+
+    <!-- Mode Presets -->
+    <div class="group">
+      <div class="group-title">Mode</div>
+      <div class="mode-btns">
+        <button id="mode-highrpm" class="mode-btn mode-active" onclick="applyMode('highrpm')">
+          <span class="mode-icon">⚡</span>
+          <span class="mode-name">High RPM</span>
+          <span class="mode-sub">Racing · micro</span>
+        </button>
+        <button id="mode-lift" class="mode-btn" onclick="applyMode('lift')">
+          <span class="mode-icon">🏋</span>
+          <span class="mode-name">Heavy Lift</span>
+          <span class="mode-sub">Low RPM · large</span>
+        </button>
+      </div>
     </div>
 
     <!-- Blade config -->
@@ -399,6 +427,22 @@
       </div>
 
       <div class="row">
+        <div class="row-lbl">Camber % <span class="v" id="v-camber">0</span></div>
+        <div class="row-in">
+          <input type="range"  id="p-camber" min="0" max="12" value="0" step="0.5" oninput="syncF('camber',1);rebuild()">
+          <input type="number" id="n-camber" value="0" min="0" max="12" step="0.5" onchange="syncR('camber');rebuild()">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-lbl">Camber Position <span class="v" id="v-camberpos">0.4</span></div>
+        <div class="row-in">
+          <input type="range"  id="p-camberpos" min="0.2" max="0.7" value="0.4" step="0.05" oninput="syncF('camberpos',2);rebuild()">
+          <input type="number" id="n-camberpos" value="0.4" min="0.2" max="0.7" step="0.05" onchange="syncR('camberpos');rebuild()">
+        </div>
+      </div>
+
+      <div class="row">
         <div class="row-lbl">Min Tip Wall (mm) <span class="v" id="v-minw">2.0</span></div>
         <div class="row-in">
           <input type="range"  id="p-minw"  min="0.8" max="5"   value="2"   step="0.1" oninput="syncF('minw',1);rebuild()">
@@ -479,19 +523,42 @@ function nacaT(x, t) {
  * minHalf: minimum per-side half-thickness in chord fractions
  *          (enforces printable wall at thin sections).
  */
-function airfoilPts(tRatio, nHalf, minHalf) {
-  const pts = [];
-  // upper: i = 0 (LE, x=0) → nHalf (TE, x=1)
-  for (let i = 0; i <= nHalf; i++) {
-    const x = 0.5 * (1 - Math.cos(Math.PI * i / nHalf));   // cosine spacing
-    pts.push([x,  Math.max(nacaT(x, tRatio), minHalf)]);
+function airfoilPts(tRatio, nHalf, minHalf, camber, camberPos) {
+  camber    = camber    || 0;
+  camberPos = camberPos || 0.4;
+
+  // NACA 4-digit mean camber line and its gradient
+  function yc(x) {
+    if (camber === 0) return 0;
+    const p = camberPos;
+    return x < p
+      ? camber * (2*p*x - x*x) / (p*p)
+      : camber * (1 - 2*p + 2*p*x - x*x) / ((1-p)*(1-p));
   }
-  // lower: i = nHalf-1 → 1  (excludes shared LE / TE points)
+  function dyc(x) {
+    if (camber === 0) return 0;
+    const p = camberPos;
+    return x < p
+      ? camber * 2*(p - x) / (p*p)
+      : camber * 2*(p - x) / ((1-p)*(1-p));
+  }
+
+  const pts = [];
+  // upper: LE → TE
+  for (let i = 0; i <= nHalf; i++) {
+    const x = 0.5 * (1 - Math.cos(Math.PI * i / nHalf));
+    const t = Math.max(nacaT(x, tRatio), minHalf);
+    const th = Math.atan(dyc(x));
+    pts.push([x - t*Math.sin(th), yc(x) + t*Math.cos(th)]);
+  }
+  // lower: TE → LE
   for (let i = nHalf - 1; i >= 1; i--) {
     const x = 0.5 * (1 - Math.cos(Math.PI * i / nHalf));
-    pts.push([x, -Math.max(nacaT(x, tRatio), minHalf)]);
+    const t = Math.max(nacaT(x, tRatio), minHalf);
+    const th = Math.atan(dyc(x));
+    pts.push([x + t*Math.sin(th), yc(x) - t*Math.cos(th)]);
   }
-  return pts; // length = 2 * nHalf
+  return pts;
 }
 
 /**
@@ -567,7 +634,7 @@ function addSupportPost(tris, cx, cz, yBot, yTop, nSides, bodyR, snapR, snapH) {
 /** Build one blade — returns flat {pos[], nor[]} triangle arrays. */
 function buildBlade(p, bladeAngle) {
   const { outerR, hubR, pitch, tipPitch, rootChord, tipChord,
-          tRatio, minWall, nRadial, nHalf, cw, hubH } = p;
+          tRatio, camber, camberPos, minWall, nRadial, nHalf, cw, hubH } = p;
 
   const betaRoot = Math.atan2(pitch, 2 * Math.PI * hubR);
   let yOff;
@@ -576,7 +643,7 @@ function buildBlade(p, bladeAngle) {
     // The blade then sits entirely above the hub — no material below Y = hubH anywhere at the root.
     // Beyond the hub, the blade floor slopes upward at the local pitch angle, so overhangs ≤ β.
     const minHRoot = (minWall / rootChord) * 0.5;
-    const rootPts  = airfoilPts(tRatio, nHalf, minHRoot);
+    const rootPts  = airfoilPts(tRatio, nHalf, minHRoot, camber, camberPos);
     const cb = Math.cos(betaRoot), sb = Math.sin(betaRoot);
     const minYRaw = Math.min(...rootPts.map(([cx, cy]) =>
       cy * rootChord * cb + (cx - 0.25) * rootChord * sb
@@ -597,7 +664,7 @@ function buildBlade(p, bladeAngle) {
     const chord = rootChord + t * (tipChord - rootChord);
     const minH  = (minWall / chord) * 0.5;   // per-side normalised min
 
-    const sec2d = airfoilPts(tRatio, nHalf, minH);
+    const sec2d = airfoilPts(tRatio, nHalf, minH, camber, camberPos);
 
     // Flat-base: per-section yOff so the lowest point of every slice sits at Y=0,
     // producing a completely flat blade bottom across the full span.
@@ -876,6 +943,8 @@ function getParams() {
     hubR:      hubD / 2,
     boreR:     bore / 2,
     tRatio:    gv('p-thick') / 100,
+    camber:    gv('p-camber') / 100,
+    camberPos: gv('p-camberpos'),
     nHalf, nRadial, nHub, cw,
   };
 }
@@ -892,6 +961,8 @@ function rebuild() {
   lbl('hubd',  p.hubD     + ' mm');
   lbl('hubh',  p.hubH     + ' mm');
   lbl('thick', p.thick    + '%');
+  lbl('camber',    (p.camber * 100).toFixed(1));
+  lbl('camberpos', p.camberPos.toFixed(2));
   lbl('minw',  p.minWall.toFixed(1) + ' mm');
   document.getElementById('s-diam').textContent  = p.diam  + ' mm';
   document.getElementById('s-pitch').textContent = p.pitch + ' mm';
@@ -1051,6 +1122,56 @@ function exportSTL() {
   a.download = `prop_${p.diam}x${p.pitch}_${p.blades}blade.stl`;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// ─── Mode presets ────────────────────────────────────────────
+function applyMode(mode) {
+  // Update active button state
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('mode-active'));
+  document.getElementById('mode-' + mode).classList.add('mode-active');
+
+  function set(id, val) {
+    const r = document.getElementById('p-' + id);
+    const n = document.getElementById('n-' + id);
+    if (r) r.value = val;
+    if (n) n.value = val;
+    const v = document.getElementById('v-' + id);
+    if (v) v.textContent = val;
+  }
+
+  if (mode === 'highrpm') {
+    set('diam',      127);   // 5" prop
+    set('pitch',     120);
+    set('pitchtip',  100);
+    set('rootc',     16);
+    set('tipc',      7);
+    set('hubd',      20);
+    set('hubh',      12);
+    set('bore',      5);
+    set('blades',    3);
+    set('thick',     9);
+    set('camber',    0);
+    set('camberpos', 0.4);
+    set('minw',      1.2);
+    // flat base on
+    document.getElementById('base-flat').checked = true;
+  } else {
+    set('diam',      305);   // 12" prop
+    set('pitch',     200);
+    set('pitchtip',  140);
+    set('rootc',     44);
+    set('tipc',      20);
+    set('hubd',      36);
+    set('hubh',      22);
+    set('bore',      8);
+    set('blades',    4);
+    set('thick',     12);
+    set('camber',    6);
+    set('camberpos', 0.4);
+    set('minw',      2.0);
+    document.getElementById('base-flat').checked = true;
+  }
+  rebuild();
 }
 
 // ═══════════════════════════════════════════════════════════════
