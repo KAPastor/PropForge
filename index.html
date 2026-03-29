@@ -655,8 +655,8 @@ function airfoilPts(tRatio, nHalf, minHalf, camber, camberPos) {
  * @param yOff   Y offset in mm (= hub height, so blade sits on top of hub)
  */
 function ptTo3D(cx, cy, chord, r, beta, cw, yOff) {
-  // Centre chord at ¼-chord (aerodynamic pitching axis)
-  const u = (cx - 0.25) * chord;   // chord direction component
+  // Centre chord at ¼-chord (aerodynamic pitching axis); negate so LE faces direction of rotation
+  const u = (0.25 - cx) * chord;   // chord direction component
   const v = cy * chord;             // thickness direction component
 
   // Rx(-β):  y' = v·cos(β) + u·sin(β),  z' = u·cos(β) − v·sin(β)
@@ -724,7 +724,7 @@ function buildBlade(p, bladeAngle) {
     const rootPts  = airfoilPts(tRatio, nHalf, minHRoot, camber, camberPos);
     const cb = Math.cos(betaRoot), sb = Math.sin(betaRoot);
     const minYRaw = Math.min(...rootPts.map(([cx, cy]) =>
-      cy * rootChord * cb + (cx - 0.25) * rootChord * sb
+      cy * rootChord * cb + (0.25 - cx) * rootChord * sb
     ));
     yOff = -minYRaw;
   } else {
@@ -750,7 +750,7 @@ function buildBlade(p, bladeAngle) {
     if (p.flatBase) {
       const cb = Math.cos(beta), sb = Math.sin(beta);
       const minYRaw = Math.min(...sec2d.map(([cx, cy]) =>
-        cy * chord * cb + (cx - 0.25) * chord * sb
+        cy * chord * cb + (0.25 - cx) * chord * sb
       ));
       sYOff = -minYRaw;
     }
