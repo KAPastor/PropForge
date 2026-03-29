@@ -997,7 +997,7 @@ function initThree() {
     if (simulating && propGroup) {
       // Visual speed capped at ~1 rev/s regardless of RPM — just shows direction
       const displayOmega = Math.PI * 2 * 0.7;
-      propGroup.rotation.y += displayOmega * dt * (propCW ? 1 : -1);
+      propGroup.rotation.y += displayOmega * dt * (propCW ? -1 : 1);
     }
 
     controls.update();
@@ -1327,13 +1327,12 @@ function updateSim() {
   document.getElementById('sh-tip').textContent    = tipSpd.toFixed(1) + ' m/s';
   document.getElementById('sh-pitch').textContent  = pitchSpd.toFixed(1) + ' m/s';
 
-  // Thrust arrow — flips with spin direction
+  // Thrust arrow — always points down (air pushed downward through prop disk)
   if (thrustArrow) {
     const maxLen = p.outerR * 1.6;
     const len = Math.min(p.hubH + 8 + thrust * 8, maxLen);
-    const dir = propCW ? -1 : 1;
-    thrustArrow.setDirection(new THREE.Vector3(0, dir, 0));
-    thrustArrow.position.set(0, dir < 0 ? p.hubH + len : -len, 0);
+    thrustArrow.setDirection(new THREE.Vector3(0, -1, 0));
+    thrustArrow.position.set(0, p.hubH + len, 0);
     thrustArrow.setLength(len, Math.min(len * 0.22, 18), Math.min(len * 0.11, 9));
   }
 }
