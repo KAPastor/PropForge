@@ -281,6 +281,7 @@
   <span class="hdr-note">3D Printable Propeller Designer</span>
   <div class="spacer"></div>
   <button id="btn-sim" class="btn btn-secondary" onclick="toggleSim()">&#9654; Simulate</button>
+  <button id="btn-spin-dir" class="btn btn-secondary" onclick="toggleSpinDir()" title="Toggle spin direction">&#8635; CCW</button>
   <button class="btn btn-secondary" onclick="openOptimizer()" style="border-color:#f59e0b;color:#b45309;">&#10024; Optimize</button>
   <button class="btn btn-primary" onclick="exportSTL()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -941,6 +942,7 @@ let propGroup = null;   // Three.js Group — contains propMesh + hubMesh so we 
 let thrustArrow = null; // ArrowHelper pointing in thrust direction
 let simulating  = false;
 let propCW      = false;  // updated by rebuild(), read by animation loop
+let spinCW      = false;  // animation spin direction only — independent of blade geometry
 let lastParams  = null;   // latest params, used by updateSim()
 
 function initThree() {
@@ -997,7 +999,7 @@ function initThree() {
     if (simulating && propGroup) {
       // Visual speed capped at ~1 rev/s regardless of RPM — just shows direction
       const displayOmega = Math.PI * 2 * 0.7;
-      propGroup.rotation.y += displayOmega * dt * (propCW ? -1 : 1);
+      propGroup.rotation.y += displayOmega * dt * (spinCW ? -1 : 1);
     }
 
     controls.update();
@@ -1335,6 +1337,11 @@ function updateSim() {
     thrustArrow.position.set(0, p.hubH + len, 0);
     thrustArrow.setLength(len, Math.min(len * 0.22, 18), Math.min(len * 0.11, 9));
   }
+}
+
+function toggleSpinDir() {
+  spinCW = !spinCW;
+  document.getElementById('btn-spin-dir').textContent = '\u21BB ' + (spinCW ? 'CW' : 'CCW');
 }
 
 function toggleSim() {
