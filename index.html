@@ -206,6 +206,55 @@
     .btn-secondary { background:var(--bg); color:var(--text); border:1.5px solid var(--border); }
     .btn-secondary:hover { border-color:var(--blue); color:var(--blue); }
     .btn-secondary.sim-active { background:#ecfdf5; border-color:var(--green); color:#059669; }
+    /* Live HUD */
+    .sim-hud {
+      display:block; position:absolute; bottom:48px; right:14px;
+      background:rgba(255,255,255,.93); backdrop-filter:blur(10px);
+      border:1px solid var(--border); border-radius:12px;
+      padding:12px 16px; min-width:190px;
+      box-shadow:0 4px 20px rgba(15,23,42,.08);
+    }
+    .sim-hud.hud-visible { display:block; }
+    .sim-hud-title { font-size:.65rem; font-weight:700; text-transform:uppercase;
+                     letter-spacing:.08em; color:var(--muted); margin-bottom:8px; }
+    .sim-hud-row { display:flex; justify-content:space-between; align-items:baseline;
+                   gap:16px; padding:3px 0; border-bottom:1px solid #f1f5f9; font-size:.78rem; }
+    .sim-hud-row:last-child { border-bottom:none; }
+    .sim-hud-row span { color:var(--muted); }
+    .sim-hud-row strong { color:var(--text); font-weight:700; }
+    /* Optimize modal */
+    .opt-backdrop {
+      display:none; position:fixed; inset:0; background:rgba(15,23,42,.45);
+      backdrop-filter:blur(4px); z-index:200; align-items:center; justify-content:center;
+    }
+    .opt-backdrop.open { display:flex; }
+    .opt-modal {
+      background:#fff; border-radius:16px; padding:28px 28px 22px;
+      width:min(520px,92vw); max-height:88vh; overflow-y:auto;
+      box-shadow:0 20px 60px rgba(15,23,42,.18);
+    }
+    .opt-modal h2 { font-size:1.05rem; font-weight:800; margin:0 0 4px; }
+    .opt-modal .opt-sub { font-size:.78rem; color:var(--muted); margin-bottom:18px; }
+    .opt-params { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:18px; }
+    .opt-param {
+      display:flex; align-items:center; gap:8px; padding:8px 10px;
+      border:1.5px solid var(--border); border-radius:8px; cursor:pointer;
+      transition:border-color .12s; user-select:none;
+    }
+    .opt-param:hover { border-color:var(--blue); }
+    .opt-param.locked { border-color:#94a3b8; background:#f8fafc; }
+    .opt-param input[type=checkbox] { accent-color:var(--blue); width:14px; height:14px; }
+    .opt-param-name { font-size:.8rem; font-weight:600; flex:1; }
+    .opt-param-val  { font-size:.75rem; color:var(--muted); }
+    .opt-progress { height:6px; background:#e2e8f0; border-radius:3px; margin-bottom:12px; overflow:hidden; }
+    .opt-progress-bar { height:100%; background:var(--blue); border-radius:3px; width:0; transition:width .1s; }
+    .opt-result { background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px;
+                  padding:12px 14px; margin-bottom:14px; display:none; }
+    .opt-result-title { font-size:.72rem; font-weight:700; color:#166534; margin-bottom:6px; }
+    .opt-result-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; font-size:.75rem; }
+    .opt-result-grid .chg-up   { color:#16a34a; font-weight:700; }
+    .opt-result-grid .chg-down { color:#dc2626; font-weight:700; }
+    .opt-footer { display:flex; gap:8px; justify-content:flex-end; }
   </style>
   <!-- Vercel Analytics -->
   <script defer src="/_vercel/insights/script.js"></script>
@@ -232,6 +281,7 @@
   <span class="hdr-note">3D Printable Propeller Designer</span>
   <div class="spacer"></div>
   <button id="btn-sim" class="btn btn-secondary" onclick="toggleSim()">&#9654; Simulate</button>
+  <button class="btn btn-secondary" onclick="openOptimizer()" style="border-color:#f59e0b;color:#b45309;">&#10024; Optimize</button>
   <button class="btn btn-primary" onclick="exportSTL()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
          stroke-linecap="round" stroke-linejoin="round">
@@ -520,6 +570,14 @@
     <canvas id="canvas"></canvas>
     <div class="vp-tip">Drag to orbit &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Right-drag to pan</div>
     <div class="vp-corner" id="vp-corner"></div>
+    <div class="sim-hud" id="sim-hud">
+      <div class="sim-hud-title">Live Estimates</div>
+      <div class="sim-hud-row"><span>Thrust</span><strong id="sh-thrust">—</strong></div>
+      <div class="sim-hud-row"><span>Power</span><strong id="sh-power">—</strong></div>
+      <div class="sim-hud-row"><span>Efficiency</span><strong id="sh-eff">—</strong></div>
+      <div class="sim-hud-row"><span>Tip Speed</span><strong id="sh-tip">—</strong></div>
+      <div class="sim-hud-row"><span>Pitch Speed</span><strong id="sh-pitch">—</strong></div>
+    </div>
   </div>
 
 </div><!-- layout -->
@@ -937,9 +995,9 @@ function initThree() {
     prevTime  = now;
 
     if (simulating && propGroup) {
-      const rpm   = parseFloat(document.getElementById('p-rpm').value) || 3000;
-      const omega = (rpm / 60) * 2 * Math.PI;  // rad/s
-      propGroup.rotation.y += omega * dt * (propCW ? -1 : 1);
+      // Visual speed capped at ~1 rev/s regardless of RPM — just shows direction
+      const displayOmega = Math.PI * 2 * 0.7;
+      propGroup.rotation.y += displayOmega * dt * (propCW ? -1 : 1);
     }
 
     controls.update();
@@ -1077,7 +1135,7 @@ function rebuild() {
 
   propCW     = p.cw;
   lastParams = p;
-  if (thrustArrow) updateSim();
+  updateSim();
 
   updateHints(p);
 }
@@ -1242,27 +1300,45 @@ function estimateThrust(p, rpm) {
 
 function updateSim() {
   if (!lastParams) return;
+  const p      = lastParams;
   const rpm    = parseFloat(document.getElementById('p-rpm').value) || 3000;
-  const thrust = estimateThrust(lastParams, rpm);
+  const n      = rpm / 60;                           // rev/s
+  const D      = p.diam / 1000;                      // metres
+  const thrust = estimateThrust(p, rpm);
   const grams  = (thrust / 9.81 * 1000).toFixed(0);
+
+  // Derived values
+  const A         = Math.PI * (D/2) * (D/2);
+  const vi        = Math.sqrt(Math.max(thrust / (2 * 1.225 * A), 0)); // induced velocity
+  const CP        = 0.006 * (p.blades / 3);
+  const powerW    = thrust * vi + CP * 1.225 * Math.pow(n, 3) * Math.pow(D, 5);
+  const effGW     = powerW > 0.01 ? (thrust * 1000 / 9.81 / powerW).toFixed(1) : '—';
+  const tipSpd    = n * Math.PI * D;                 // m/s
+  const pitchSpd  = n * (p.pitch / 1000);            // m/s
+
+  // Sidebar thrust pill
   document.getElementById('s-thrust').textContent =
     thrust.toFixed(2) + ' N \u00a0 (' + grams + ' g)';
 
-  // Update arrow: origin = hub top centre, length scales with thrust
+  // HUD
+  document.getElementById('sh-thrust').textContent = grams + ' g  (' + thrust.toFixed(1) + ' N)';
+  document.getElementById('sh-power').textContent  = powerW.toFixed(1) + ' W';
+  document.getElementById('sh-eff').textContent    = effGW + ' g/W';
+  document.getElementById('sh-tip').textContent    = tipSpd.toFixed(1) + ' m/s';
+  document.getElementById('sh-pitch').textContent  = pitchSpd.toFixed(1) + ' m/s';
+
+  // Thrust arrow
   if (thrustArrow) {
-    const hubH  = lastParams.hubH;
-    const maxLen = lastParams.outerR * 1.6;
-    const minLen = hubH + 8;
-    // Arrow length: 8mm/N + min, capped at maxLen
-    const len = Math.min(minLen + thrust * 8, maxLen);
-    thrustArrow.position.set(0, hubH, 0);
+    const maxLen = p.outerR * 1.6;
+    const len = Math.min(p.hubH + 8 + thrust * 8, maxLen);
+    thrustArrow.position.set(0, p.hubH, 0);
     thrustArrow.setLength(len, Math.min(len * 0.22, 18), Math.min(len * 0.11, 9));
   }
 }
 
 function toggleSim() {
   simulating = !simulating;
-  const btn  = document.getElementById('btn-sim');
+  const btn = document.getElementById('btn-sim');
   if (simulating) {
     btn.textContent = '\u23F8 Stop';
     btn.classList.add('sim-active');
@@ -1273,8 +1349,155 @@ function toggleSim() {
     btn.textContent = '\u25B6 Simulate';
     btn.classList.remove('sim-active');
     if (thrustArrow) thrustArrow.visible = false;
-    if (propGroup)   propGroup.rotation.y = 0;
+    if (propGroup) propGroup.rotation.y = 0;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  OPTIMIZER
+// ═══════════════════════════════════════════════════════════════
+const OPT_PARAMS = [
+  { key:'diam',     label:'Diameter',    id:'p-diam',     min:60,  max:500, step:5,   unit:'mm' },
+  { key:'pitch',    label:'Root Pitch',  id:'p-pitch',    min:30,  max:350, step:5,   unit:'mm' },
+  { key:'pitchtip', label:'Tip Pitch',   id:'p-pitchtip', min:30,  max:350, step:5,   unit:'mm' },
+  { key:'rootc',    label:'Root Chord',  id:'p-rootc',    min:8,   max:80,  step:1,   unit:'mm' },
+  { key:'tipc',     label:'Tip Chord',   id:'p-tipc',     min:3,   max:50,  step:1,   unit:'mm' },
+  { key:'blades',   label:'Blades',      id:'p-blades',   min:1,   max:5,   step:1,   unit:''   },
+  { key:'camber',   label:'Camber',      id:'p-camber',   min:0,   max:12,  step:0.5, unit:'%'  },
+  { key:'thick',    label:'Thickness',   id:'p-thick',    min:6,   max:22,  step:1,   unit:'%'  },
+];
+
+let optResult = null; // best solution found
+
+function openOptimizer() {
+  // Build checkboxes from current slider values
+  const container = document.getElementById('opt-params');
+  container.innerHTML = '';
+  OPT_PARAMS.forEach(op => {
+    const cur = parseFloat(document.getElementById(op.id).value);
+    const div = document.createElement('label');
+    div.className = 'opt-param';
+    div.innerHTML = `<input type="checkbox" checked data-key="${op.key}">
+      <span class="opt-param-name">${op.label}</span>
+      <span class="opt-param-val">${cur}${op.unit}</span>`;
+    div.querySelector('input').addEventListener('change', e => {
+      div.classList.toggle('locked', !e.target.checked);
+    });
+    container.appendChild(div);
+  });
+  document.getElementById('opt-result').style.display = 'none';
+  document.getElementById('opt-apply-btn').style.display = 'none';
+  document.getElementById('opt-bar').style.width = '0';
+  document.getElementById('opt-run-btn').disabled = false;
+  document.getElementById('opt-run-btn').textContent = 'Run Optimizer';
+  document.getElementById('opt-backdrop').classList.add('open');
+}
+
+function closeOptimizer() {
+  document.getElementById('opt-backdrop').classList.remove('open');
+  optResult = null;
+}
+
+function applyOptResult() {
+  if (!optResult) return;
+  OPT_PARAMS.forEach(op => {
+    if (optResult[op.key] !== undefined) {
+      const r = document.getElementById(op.id);
+      const n = document.getElementById('n-' + op.key) || document.getElementById('n-' + op.id.replace('p-',''));
+      const v = optResult[op.key];
+      if (r) r.value = v;
+      // number input id convention: n-diam, n-pitch, etc.
+      const nEl = document.getElementById('n-' + op.key);
+      if (nEl) nEl.value = v;
+      const vEl = document.getElementById('v-' + op.key);
+      if (vEl) vEl.textContent = v;
+    }
+  });
+  // blades is a select
+  if (optResult.blades !== undefined) {
+    document.getElementById('p-blades').value = optResult.blades;
+  }
+  closeOptimizer();
+  rebuild();
+}
+
+function runOptimizer() {
+  const rpm = parseFloat(document.getElementById('p-rpm').value) || 3000;
+
+  // Snapshot which params are free vs locked
+  const free = [];
+  document.querySelectorAll('#opt-params .opt-param input[type=checkbox]').forEach(cb => {
+    if (cb.checked) {
+      const op = OPT_PARAMS.find(o => o.key === cb.dataset.key);
+      if (op) free.push(op);
+    }
+  });
+  if (free.length === 0) return;
+
+  // Starting values from current UI
+  const current = {};
+  OPT_PARAMS.forEach(op => {
+    current[op.key] = parseFloat(document.getElementById(op.id).value);
+  });
+
+  // Objective: thrust at given RPM — build a minimal param object
+  function score(vals) {
+    const p = {
+      diam: vals.diam, pitch: vals.pitch, tipPitch: vals.pitchtip,
+      blades: Math.round(vals.blades), outerR: vals.diam / 2, hubR: current.hubd ? current.hubd/2 : 15,
+    };
+    // Penalise tip speed > 200 m/s
+    const n = rpm / 60, tipSpd = n * Math.PI * (vals.diam / 1000);
+    if (tipSpd > 200) return -1e9;
+    return estimateThrust(p, rpm);
+  }
+
+  let best = Object.assign({}, current);
+  let bestScore = score(best);
+
+  const ITERS = 600;
+  const bar = document.getElementById('opt-bar');
+  const runBtn = document.getElementById('opt-run-btn');
+  runBtn.disabled = true;
+
+  let iter = 0;
+  function step() {
+    const batch = 30;
+    for (let b = 0; b < batch && iter < ITERS; b++, iter++) {
+      // Pick a random free param and try a perturbation
+      const op  = free[Math.floor(Math.random() * free.length)];
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      // Step size: large early, small late for fine-tuning
+      const scale = iter < ITERS * 0.6 ? 1 + Math.floor(Math.random() * 4) : 1;
+      const trial = Object.assign({}, best);
+      trial[op.key] = Math.min(op.max, Math.max(op.min,
+        Math.round((best[op.key] + dir * op.step * scale) / op.step) * op.step));
+      const s = score(trial);
+      if (s > bestScore) { bestScore = s; best = Object.assign({}, trial); }
+    }
+    bar.style.width = (iter / ITERS * 100) + '%';
+    if (iter < ITERS) { requestAnimationFrame(step); return; }
+
+    // Done — show diff
+    optResult = best;
+    const grid = document.getElementById('opt-result-grid');
+    grid.innerHTML = '';
+    free.forEach(op => {
+      const before = current[op.key], after = best[op.key];
+      if (before === after) return;
+      const pct = before ? ((after - before) / before * 100).toFixed(0) : '';
+      const cls = after > before ? 'chg-up' : 'chg-down';
+      const arrow = after > before ? '▲' : '▼';
+      grid.innerHTML += `<span>${op.label}</span><span class="${cls}">${before}${op.unit} → ${after}${op.unit} ${arrow}${Math.abs(pct)}%</span>`;
+    });
+    const thrustBefore = estimateThrust({ diam:current.diam, pitch:current.pitch, blades:Math.round(current.blades), outerR:current.diam/2 }, rpm);
+    grid.innerHTML += `<span>Thrust gain</span><span class="chg-up">+${((bestScore/thrustBefore - 1)*100).toFixed(0)}%</span>`;
+    document.getElementById('opt-result').style.display = '';
+    document.getElementById('opt-apply-btn').style.display = '';
+    runBtn.textContent = 'Re-run';
+    runBtn.disabled = false;
+  }
+  requestAnimationFrame(step);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1348,5 +1571,24 @@ function syncR(key) {
 initThree();
 rebuild();
 </script>
+
+<!-- ═══ Optimizer Modal ═══════════════════════════════════════ -->
+<div class="opt-backdrop" id="opt-backdrop" onclick="if(event.target===this)closeOptimizer()">
+  <div class="opt-modal">
+    <h2>&#10024; Lift Optimizer</h2>
+    <p class="opt-sub">Check parameters to <strong>optimize</strong>. Uncheck to <strong>lock</strong> them at their current value.</p>
+    <div class="opt-params" id="opt-params"><!-- populated by JS --></div>
+    <div class="opt-progress"><div class="opt-progress-bar" id="opt-bar"></div></div>
+    <div class="opt-result" id="opt-result">
+      <div class="opt-result-title">&#10003; Optimization complete — changes below</div>
+      <div class="opt-result-grid" id="opt-result-grid"></div>
+    </div>
+    <div class="opt-footer">
+      <button class="btn" style="background:#f1f5f9;color:var(--text)" onclick="closeOptimizer()">Cancel</button>
+      <button class="btn" id="opt-apply-btn" style="display:none;background:#16a34a;color:#fff" onclick="applyOptResult()">Apply</button>
+      <button class="btn btn-primary" id="opt-run-btn" onclick="runOptimizer()">Run Optimizer</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
