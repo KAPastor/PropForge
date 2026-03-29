@@ -997,7 +997,7 @@ function initThree() {
     if (simulating && propGroup) {
       // Visual speed capped at ~1 rev/s regardless of RPM — just shows direction
       const displayOmega = Math.PI * 2 * 0.7;
-      propGroup.rotation.y += displayOmega * dt * (propCW ? -1 : 1);
+      propGroup.rotation.y += displayOmega * dt * (propCW ? 1 : -1);
     }
 
     controls.update();
