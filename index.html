@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PropForge — 3D Printable Prop Designer</title>
+  <title>Coreform — 3D Printable Part Designer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -337,8 +337,8 @@
         <path d="M14.82 2.41C11.57 2.41 8.93 5.05 8.93 8.3c0 3.24 2.64 5.88 5.89 5.88 3.24 0 5.88-2.64 5.88-5.88 0-3.25-2.64-5.89-5.88-5.89zM2 21.6h3.5V2.41H2V21.6z"/>
       </svg>
     </div>
-    <h2>PropForge is free &amp; open source</h2>
-    <p>If this tool saves you time designing props, consider supporting development on Patreon. It helps keep new features coming!</p>
+    <h2>Coreform is free &amp; open source</h2>
+    <p>If this tool saves you time designing parts, consider supporting development on Patreon. It helps keep new features coming!</p>
     <div class="pat-row" style="display:flex;gap:10px;justify-content:center;">
       <button class="pat-btn pat-btn-primary" onclick="openPatreon()">Support on Patreon</button>
       <button class="pat-btn pat-btn-secondary" onclick="closePatreon()">Maybe later</button>
@@ -362,7 +362,7 @@
 
 <!-- Header -->
 <header>
-  <div class="brand">Prop<em>Forge</em></div>
+  <div class="brand">Core<em>form</em></div>
   <div class="badge">BLDC</div>
   <span class="hdr-note">3D Printable Propeller Designer</span>
   <div class="spacer"></div>
@@ -1741,7 +1741,7 @@ function exportSTL() {
   const dv  = new DataView(buf);
 
   // Header
-  const hdr = new TextEncoder().encode('PropForge — 3D Printable Prop');
+  const hdr = new TextEncoder().encode('Coreform — 3D Printable Parts');
   for (let i = 0; i < Math.min(hdr.length, 80); i++) dv.setUint8(i, hdr[i]);
   dv.setUint32(80, nTri, true);
 
