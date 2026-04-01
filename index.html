@@ -286,15 +286,38 @@
     .opt-result-grid .chg-up   { color:#16a34a; font-weight:700; }
     .opt-result-grid .chg-down { color:#dc2626; font-weight:700; }
     .opt-footer { display:flex; gap:8px; justify-content:flex-end; }
-    /* Tool tabs */
-    .tool-tabs { display:flex; gap:4px; padding:10px 12px 4px; flex-shrink:0; }
-    .tool-tab {
-      flex:1; padding:7px 4px; border:1px solid var(--border); border-radius:8px;
-      font-size:.8rem; font-weight:700; cursor:pointer; background:var(--surf);
-      color:var(--muted); transition:.15s; font-family:inherit;
+    /* Tool selector dropdown */
+    .tool-select-wrap { padding:10px 12px 4px; flex-shrink:0; position:relative; }
+    .tool-select-input {
+      width:100%; padding:8px 32px 8px 12px; border:1px solid var(--border);
+      border-radius:10px; font-family:inherit; font-size:.85rem; font-weight:600;
+      color:var(--text); background:#fff; cursor:pointer; outline:none;
+      box-shadow:var(--shadow); transition:border-color .15s;
     }
-    .tool-tab.tool-tab-active { background:var(--blue); color:#fff; border-color:var(--blue); }
-    .tool-tab:hover:not(.tool-tab-active) { background:#e2e8f0; color:var(--text); }
+    .tool-select-input:focus { border-color:var(--blue); }
+    .tool-select-arrow {
+      position:absolute; right:22px; top:50%; transform:translateY(-50%);
+      pointer-events:none; color:var(--muted); font-size:.7rem;
+    }
+    .tool-dropdown {
+      display:none; position:absolute; left:12px; right:12px; top:calc(100% - 2px);
+      background:#fff; border:1px solid var(--border); border-radius:10px;
+      box-shadow:0 8px 24px rgba(15,23,42,.13); z-index:500; overflow:hidden;
+    }
+    .tool-dropdown.open { display:block; }
+    .tool-dropdown-search {
+      width:100%; padding:8px 12px; border:none; border-bottom:1px solid var(--border);
+      font-family:inherit; font-size:.82rem; outline:none; color:var(--text);
+    }
+    .tool-option {
+      padding:9px 14px; font-size:.84rem; font-weight:600; cursor:pointer;
+      display:flex; align-items:center; gap:8px; color:var(--text);
+    }
+    .tool-option:hover { background:#f1f5f9; }
+    .tool-option.selected { color:var(--blue); }
+    .tool-option-icon { font-size:1rem; width:20px; text-align:center; }
+    .tool-option-sub { font-size:.72rem; color:var(--muted); font-weight:400; margin-left:auto; }
+    .tool-option.hidden { display:none; }
     /* Fastener info */
     .f-info-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border); }
     .f-info-row:last-child { border-bottom:none; }
@@ -364,9 +387,20 @@
   <aside class="sidebar">
 
     <!-- Tool selector -->
-    <div class="tool-tabs">
-      <button class="tool-tab tool-tab-active" id="tab-prop"      onclick="switchTool('prop')">Propeller</button>
-      <button class="tool-tab"                 id="tab-fastener"  onclick="switchTool('fastener')">Nut &amp; Bolt</button>
+    <div class="tool-select-wrap">
+      <input class="tool-select-input" id="tool-select-display" readonly
+             value="Propeller" onclick="toggleToolDropdown()" placeholder="Search tools…">
+      <span class="tool-select-arrow">&#9660;</span>
+      <div class="tool-dropdown" id="tool-dropdown">
+        <input class="tool-dropdown-search" id="tool-dropdown-search"
+               placeholder="Search…" oninput="filterTools(this.value)" autocomplete="off">
+        <div class="tool-option selected" data-mode="prop"      onclick="selectTool('prop')">
+          <span class="tool-option-icon">🛩</span>Propeller<span class="tool-option-sub">BLDC blade designer</span>
+        </div>
+        <div class="tool-option"          data-mode="fastener"  onclick="selectTool('fastener')">
+          <span class="tool-option-icon">🔩</span>Nut &amp; Bolt<span class="tool-option-sub">Metric fasteners</span>
+        </div>
+      </div>
     </div>
 
     <!-- Quick stats -->
@@ -1336,10 +1370,43 @@ function rebuildFastener() {
   }
 }
 
+const TOOL_LABELS = { prop: 'Propeller', fastener: 'Nut & Bolt' };
+
+function toggleToolDropdown() {
+  const dd = document.getElementById('tool-dropdown');
+  const open = dd.classList.toggle('open');
+  if (open) {
+    document.getElementById('tool-dropdown-search').value = '';
+    filterTools('');
+    setTimeout(() => document.getElementById('tool-dropdown-search').focus(), 30);
+  }
+}
+
+function filterTools(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('#tool-dropdown .tool-option').forEach(el => {
+    el.classList.toggle('hidden', q && !el.textContent.toLowerCase().includes(q));
+  });
+}
+
+function selectTool(mode) {
+  document.getElementById('tool-dropdown').classList.remove('open');
+  document.getElementById('tool-select-display').value = TOOL_LABELS[mode] || mode;
+  document.querySelectorAll('#tool-dropdown .tool-option').forEach(el => {
+    el.classList.toggle('selected', el.dataset.mode === mode);
+  });
+  switchTool(mode);
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.tool-select-wrap')) {
+    document.getElementById('tool-dropdown')?.classList.remove('open');
+  }
+});
+
 function switchTool(mode) {
   appMode = mode;
-  document.getElementById('tab-prop').classList.toggle('tool-tab-active',     mode === 'prop');
-  document.getElementById('tab-fastener').classList.toggle('tool-tab-active', mode === 'fastener');
   document.getElementById('prop-panel').style.display      = mode === 'prop'      ? '' : 'none';
   document.getElementById('fastener-panel').style.display  = mode === 'fastener'  ? '' : 'none';
   ['btn-sim','btn-spin-dir'].forEach(id => {
