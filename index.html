@@ -119,7 +119,7 @@
       border-bottom:1px solid var(--border);
       display:flex; flex-direction:column; gap:5px;
     }
-    .row:last-child { border-bottom:none; }
+    .row:last-child { border-bottom:none; padding-bottom:13px; }
     .row-lbl {
       display:flex; justify-content:space-between; align-items:center;
       font-size:.78rem; font-weight:600;
@@ -669,6 +669,13 @@
         <div class="group-title">Dimensions</div>
         <div id="f-bolt-rows">
           <div class="row">
+            <div class="row-lbl">Head Style</div>
+            <div class="radio-row">
+              <input type="radio" name="fhead" id="fhead-hex"   value="hex"   checked onchange="rebuildFastener()"><label for="fhead-hex">Hex Head</label>
+              <input type="radio" name="fhead" id="fhead-shaft" value="shaft"         onchange="rebuildFastener()"><label for="fhead-shaft">Shaft Only</label>
+            </div>
+          </div>
+          <div class="row">
             <div class="row-lbl">Shank Length <span class="v" id="v-flen">20</span> mm</div>
             <div class="row-in">
               <input type="range"  id="f-len"  min="3" max="150" value="20" step="1"   oninput="fsync('len');rebuildFastener()">
@@ -1113,8 +1120,8 @@ function trisToBuffers(tris) {
   return {pos, nor};
 }
 
-/** Bolt: hex-head + externally threaded shank. Y=0 is shank tip, Y=shankLen+headH is top of head. */
-function buildBoltGeometry({majorR, minorR, pitch, shankLen, headH, hexR, nSeg, nRing}) {
+/** Bolt: hex-head (optional) + externally threaded shank. Y=0 is shank tip. */
+function buildBoltGeometry({majorR, minorR, pitch, shankLen, headH, hexR, nSeg, nRing, headStyle}) {
   const tris = [];
   const PI2 = Math.PI * 2;
 
@@ -1149,25 +1156,29 @@ function buildBoltGeometry({majorR, minorR, pitch, shankLen, headH, hexR, nSeg, 
     tris.push([0,0,0], [majorR*Math.cos(a0),0,majorR*Math.sin(a0)], [majorR*Math.cos(a1),0,majorR*Math.sin(a1)]);
   }
 
-  // ── Hex head ────────────────────────────────────────────────
-  const y0 = shankLen, y1 = shankLen + headH;
-  const hx = i => hexR * Math.cos(i * Math.PI/3 + Math.PI/6);
-  const hz = i => hexR * Math.sin(i * Math.PI/3 + Math.PI/6);
-  for (let f = 0; f < 6; f++) {
-    const f1 = (f+1)%6;
-    // Side (outward winding)
-    tris.push([hx(f),y0,hz(f)], [hx(f),y1,hz(f)], [hx(f1),y0,hz(f1)]);
-    tris.push([hx(f1),y0,hz(f1)], [hx(f),y1,hz(f)], [hx(f1),y1,hz(f1)]);
-  }
-  // Head top face (normal +Y)
-  for (let f = 0; f < 6; f++) {
-    const f1=(f+1)%6;
-    tris.push([0,y1,0], [hx(f1),y1,hz(f1)], [hx(f),y1,hz(f)]);
-  }
-  // Head bottom face / bearing face (normal -Y, covers shank)
-  for (let f = 0; f < 6; f++) {
-    const f1=(f+1)%6;
-    tris.push([0,y0,0], [hx(f),y0,hz(f)], [hx(f1),y0,hz(f1)]);
+  if (headStyle !== 'shaft') {
+    // ── Hex head ──────────────────────────────────────────────
+    const y0 = shankLen, y1 = shankLen + headH;
+    const hx = i => hexR * Math.cos(i * Math.PI/3 + Math.PI/6);
+    const hz = i => hexR * Math.sin(i * Math.PI/3 + Math.PI/6);
+    for (let f = 0; f < 6; f++) {
+      const f1 = (f+1)%6;
+      tris.push([hx(f),y0,hz(f)], [hx(f),y1,hz(f)], [hx(f1),y0,hz(f1)]);
+      tris.push([hx(f1),y0,hz(f1)], [hx(f),y1,hz(f)], [hx(f1),y1,hz(f1)]);
+    }
+    for (let f = 0; f < 6; f++) {
+      const f1=(f+1)%6;
+      const hx2 = i => hexR * Math.cos(i * Math.PI/3 + Math.PI/6);
+      const hz2 = i => hexR * Math.sin(i * Math.PI/3 + Math.PI/6);
+      tris.push([0,y1,0], [hx2(f1),y1,hz2(f1)], [hx2(f),y1,hz2(f)]);
+      tris.push([0,y0,0], [hx2(f),y0,hz2(f)], [hx2(f1),y0,hz2(f1)]);
+    }
+  } else {
+    // Shaft-only: flat cap at top of shank
+    for (let si = 0; si < nSeg; si++) {
+      const a0=(si/nSeg)*PI2, a1=((si+1)/nSeg)*PI2;
+      tris.push([0,shankLen,0], [majorR*Math.cos(a1),shankLen,majorR*Math.sin(a1)], [majorR*Math.cos(a0),shankLen,majorR*Math.sin(a0)]);
+    }
   }
 
   return trisToBuffers(tris);
@@ -1255,9 +1266,10 @@ function getFastenerParams() {
   const hexR      = m.af / (2 * Math.cos(Math.PI/6));
 
   if (type === 'bolt') {
-    const shankLen = parseFloat(document.getElementById('f-len').value);
-    const nRing    = Math.max(6, Math.ceil((shankLen / m.pitch) * 14));
-    return { type, size, tol, pitch: m.pitch,
+    const shankLen  = parseFloat(document.getElementById('f-len').value);
+    const headStyle = document.querySelector('input[name=fhead]:checked').value;
+    const nRing     = Math.max(6, Math.ceil((shankLen / m.pitch) * 14));
+    return { type, size, tol, pitch: m.pitch, headStyle,
       majorR: majorR - tol * 0.5,
       minorR: majorR - threadH - tol * 0.5,
       shankLen, headH: m.headH, hexR, nSeg, nRing };
