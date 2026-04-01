@@ -286,6 +286,18 @@
     .opt-result-grid .chg-up   { color:#16a34a; font-weight:700; }
     .opt-result-grid .chg-down { color:#dc2626; font-weight:700; }
     .opt-footer { display:flex; gap:8px; justify-content:flex-end; }
+    /* Tool tabs */
+    .tool-tabs { display:flex; gap:4px; padding:10px 12px 4px; flex-shrink:0; }
+    .tool-tab {
+      flex:1; padding:7px 4px; border:1px solid var(--border); border-radius:8px;
+      font-size:.8rem; font-weight:700; cursor:pointer; background:var(--surf);
+      color:var(--muted); transition:.15s; font-family:inherit;
+    }
+    .tool-tab.tool-tab-active { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .tool-tab:hover:not(.tool-tab-active) { background:#e2e8f0; color:var(--text); }
+    /* Fastener info */
+    .f-info-row { display:flex; justify-content:space-between; padding:1px 0; }
+    .f-info-row strong { color:var(--text); }
   </style>
   <!-- Vercel Analytics -->
   <script defer src="/_vercel/insights/script.js"></script>
@@ -349,6 +361,12 @@
   <!-- ═══ Sidebar ══════════════════════════════════════════ -->
   <aside class="sidebar">
 
+    <!-- Tool selector -->
+    <div class="tool-tabs">
+      <button class="tool-tab tool-tab-active" id="tab-prop"      onclick="switchTool('prop')">Propeller</button>
+      <button class="tool-tab"                 id="tab-fastener"  onclick="switchTool('fastener')">Nut &amp; Bolt</button>
+    </div>
+
     <!-- Quick stats -->
     <div class="stats">
       <div class="stat"><div class="stat-v" id="s-diam">—</div><div class="stat-l">Diameter</div></div>
@@ -356,6 +374,7 @@
       <div class="stat"><div class="stat-v" id="s-tris">—</div><div class="stat-l">Triangles</div></div>
     </div>
 
+    <div id="prop-panel">
     <!-- Mode Presets -->
     <div class="group">
       <div class="group-title">Mode</div>
@@ -613,6 +632,86 @@
       <div class="group-title">Print Analysis</div>
       <div class="hints" id="hints"></div>
     </div>
+
+    </div><!-- /prop-panel -->
+
+    <!-- ═══ Fastener panel ══════════════════════════════════ -->
+    <div id="fastener-panel" style="display:none">
+
+      <div class="group">
+        <div class="group-title">Thread Standard</div>
+        <div class="row">
+          <div class="row-lbl">Size</div>
+          <select id="f-size" onchange="onFSizeChange();rebuildFastener()">
+            <option value="M2">M2 × 0.4</option>
+            <option value="M2.5">M2.5 × 0.45</option>
+            <option value="M3">M3 × 0.5</option>
+            <option value="M4">M4 × 0.7</option>
+            <option value="M5" selected>M5 × 0.8</option>
+            <option value="M6">M6 × 1.0</option>
+            <option value="M8">M8 × 1.25</option>
+            <option value="M10">M10 × 1.5</option>
+            <option value="M12">M12 × 1.75</option>
+            <option value="M16">M16 × 2.0</option>
+            <option value="M20">M20 × 2.5</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="row-lbl">Type</div>
+          <div class="radio-row">
+            <input type="radio" name="ftype" id="ftype-bolt" value="bolt" checked onchange="onFTypeChange();rebuildFastener()"><label for="ftype-bolt">Bolt</label>
+            <input type="radio" name="ftype" id="ftype-nut"  value="nut"        onchange="onFTypeChange();rebuildFastener()"><label for="ftype-nut">Nut</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">Dimensions</div>
+        <div id="f-bolt-rows">
+          <div class="row">
+            <div class="row-lbl">Shank Length <span class="v" id="v-flen">20</span> mm</div>
+            <div class="row-in">
+              <input type="range"  id="f-len"  min="3" max="150" value="20" step="1"   oninput="fsync('len');rebuildFastener()">
+              <input type="number" id="fn-len" value="20" min="3" max="150"            onchange="fsyncR('len');rebuildFastener()">
+            </div>
+          </div>
+        </div>
+        <div id="f-nut-rows" style="display:none">
+          <div class="row">
+            <div class="row-lbl">Nut Height <span class="v" id="v-fnuth">4.0</span> mm</div>
+            <div class="row-in">
+              <input type="range"  id="f-nuth"  min="1" max="30" value="4" step="0.1"   oninput="fsyncF('nuth',1);rebuildFastener()">
+              <input type="number" id="fn-nuth" value="4" min="1" max="30" step="0.1"   onchange="fsyncR('nuth');rebuildFastener()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">Print Tolerance</div>
+        <div class="row">
+          <div class="row-lbl">Clearance <span class="v" id="v-ftol">0.20</span> mm</div>
+          <div class="row-in">
+            <input type="range"  id="f-tol"  min="0" max="0.5" value="0.2" step="0.01"  oninput="fsyncF('tol',2);rebuildFastener()">
+            <input type="number" id="fn-tol" value="0.2" min="0" max="0.5" step="0.01"  onchange="fsyncR('tol');rebuildFastener()">
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-lbl">Resolution</div>
+          <select id="f-res" onchange="rebuildFastener()">
+            <option value="low">Low (fast preview)</option>
+            <option value="mid" selected>Medium</option>
+            <option value="high">High (export quality)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">Thread Info</div>
+        <div id="f-info" style="font-size:.8rem;line-height:1.8;color:var(--muted)">—</div>
+      </div>
+
+    </div><!-- /fastener-panel -->
 
   </aside>
 
@@ -983,6 +1082,308 @@ function buildHub(hubR, hubH, boreR, nSeg, threadOn, threadRH, threadPitch, thre
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  NUT & BOLT MAKER
+// ═══════════════════════════════════════════════════════════════
+
+const METRIC_THREADS = {
+  'M2':   {d:2,   pitch:0.40,  af:4.0,  headH:1.4,  nutH:1.6 },
+  'M2.5': {d:2.5, pitch:0.45,  af:5.0,  headH:1.7,  nutH:2.0 },
+  'M3':   {d:3,   pitch:0.50,  af:5.5,  headH:2.0,  nutH:2.4 },
+  'M4':   {d:4,   pitch:0.70,  af:7.0,  headH:2.8,  nutH:3.2 },
+  'M5':   {d:5,   pitch:0.80,  af:8.0,  headH:3.5,  nutH:4.0 },
+  'M6':   {d:6,   pitch:1.00,  af:10.0, headH:4.0,  nutH:5.0 },
+  'M8':   {d:8,   pitch:1.25,  af:13.0, headH:5.3,  nutH:6.5 },
+  'M10':  {d:10,  pitch:1.50,  af:17.0, headH:6.4,  nutH:8.0 },
+  'M12':  {d:12,  pitch:1.75,  af:19.0, headH:7.5,  nutH:10.0},
+  'M16':  {d:16,  pitch:2.00,  af:24.0, headH:10.0, nutH:13.0},
+  'M20':  {d:20,  pitch:2.50,  af:30.0, headH:12.5, nutH:16.0},
+};
+
+/** Convert flat array of [x,y,z] triangle triplets → {pos[], nor[]} */
+function trisToBuffers(tris) {
+  const pos = [], nor = [];
+  for (let i = 0; i < tris.length; i += 3) {
+    const [ax,ay,az]=tris[i], [bx,by,bz]=tris[i+1], [cx,cy,cz]=tris[i+2];
+    const ex=bx-ax,ey=by-ay,ez=bz-az, fx=cx-ax,fy=cy-ay,fz=cz-az;
+    const nx=ey*fz-ez*fy, ny=ez*fx-ex*fz, nz=ex*fy-ey*fx;
+    const nl=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+    pos.push(ax,ay,az,bx,by,bz,cx,cy,cz);
+    nor.push(nx/nl,ny/nl,nz/nl, nx/nl,ny/nl,nz/nl, nx/nl,ny/nl,nz/nl);
+  }
+  return {pos, nor};
+}
+
+/** Bolt: hex-head + externally threaded shank. Y=0 is shank tip, Y=shankLen+headH is top of head. */
+function buildBoltGeometry({majorR, minorR, pitch, shankLen, headH, hexR, nSeg, nRing}) {
+  const tris = [];
+  const PI2 = Math.PI * 2;
+
+  // ── Externally threaded shank ────────────────────────────────
+  const grid = [];
+  for (let ri = 0; ri <= nRing; ri++) {
+    const y = (ri / nRing) * shankLen;
+    const row = [];
+    const isEdge = ri === 0 || ri === nRing;
+    for (let si = 0; si <= nSeg; si++) {
+      const v = (si / nSeg) * PI2;
+      let r = majorR;
+      if (!isEdge) {
+        const phi = (y / pitch) - (si / nSeg);
+        const t   = Math.abs(((phi % 1) + 1) % 1 - 0.5) * 2;
+        r = minorR + t * (majorR - minorR);
+      }
+      row.push([r * Math.cos(v), y, r * Math.sin(v)]);
+    }
+    grid.push(row);
+  }
+  // External winding (normals out)
+  for (let ri = 0; ri < nRing; ri++) {
+    for (let si = 0; si < nSeg; si++) {
+      tris.push(grid[ri][si], grid[ri][si+1], grid[ri+1][si+1]);
+      tris.push(grid[ri][si], grid[ri+1][si+1], grid[ri+1][si]);
+    }
+  }
+  // Shank tip cap (Y=0 disc, normal down)
+  for (let si = 0; si < nSeg; si++) {
+    const a0=(si/nSeg)*PI2, a1=((si+1)/nSeg)*PI2;
+    tris.push([0,0,0], [majorR*Math.cos(a0),0,majorR*Math.sin(a0)], [majorR*Math.cos(a1),0,majorR*Math.sin(a1)]);
+  }
+
+  // ── Hex head ────────────────────────────────────────────────
+  const y0 = shankLen, y1 = shankLen + headH;
+  const hx = i => hexR * Math.cos(i * Math.PI/3 + Math.PI/6);
+  const hz = i => hexR * Math.sin(i * Math.PI/3 + Math.PI/6);
+  for (let f = 0; f < 6; f++) {
+    const f1 = (f+1)%6;
+    // Side (outward winding)
+    tris.push([hx(f),y0,hz(f)], [hx(f),y1,hz(f)], [hx(f1),y0,hz(f1)]);
+    tris.push([hx(f1),y0,hz(f1)], [hx(f),y1,hz(f)], [hx(f1),y1,hz(f1)]);
+  }
+  // Head top face (normal +Y)
+  for (let f = 0; f < 6; f++) {
+    const f1=(f+1)%6;
+    tris.push([0,y1,0], [hx(f1),y1,hz(f1)], [hx(f),y1,hz(f)]);
+  }
+  // Head bottom face / bearing face (normal -Y, covers shank)
+  for (let f = 0; f < 6; f++) {
+    const f1=(f+1)%6;
+    tris.push([0,y0,0], [hx(f),y0,hz(f)], [hx(f1),y0,hz(f1)]);
+  }
+
+  return trisToBuffers(tris);
+}
+
+/** Nut: hex prism with internally threaded bore. Y=0 bottom, Y=nutH top. */
+function buildNutGeometry({majorR, minorR, pitch, nutH, hexR, nSeg}) {
+  const tris = [];
+  const PI2 = Math.PI * 2;
+  const hx = i => hexR * Math.cos(i * Math.PI/3 + Math.PI/6);
+  const hz = i => hexR * Math.sin(i * Math.PI/3 + Math.PI/6);
+
+  // ── Hex outer walls ──────────────────────────────────────────
+  for (let f = 0; f < 6; f++) {
+    const f1=(f+1)%6;
+    tris.push([hx(f),0,hz(f)], [hx(f),nutH,hz(f)], [hx(f1),0,hz(f1)]);
+    tris.push([hx(f1),0,hz(f1)], [hx(f),nutH,hz(f)], [hx(f1),nutH,hz(f1)]);
+  }
+
+  // ── Internal threaded bore ───────────────────────────────────
+  const nRing = Math.max(4, Math.ceil((nutH / pitch) * 16));
+  const grid = [];
+  for (let ri = 0; ri <= nRing; ri++) {
+    const y = (ri / nRing) * nutH;
+    const row = [];
+    const isEdge = ri === 0 || ri === nRing;
+    for (let si = 0; si <= nSeg; si++) {
+      const v = (si / nSeg) * PI2;
+      let r = majorR;
+      if (!isEdge) {
+        const phi = (y / pitch) - (si / nSeg);
+        const t   = Math.abs(((phi % 1) + 1) % 1 - 0.5) * 2;
+        r = majorR - t * (majorR - minorR);
+      }
+      row.push([r * Math.cos(v), y, r * Math.sin(v)]);
+    }
+    grid.push(row);
+  }
+  // Internal winding (normals inward)
+  for (let ri = 0; ri < nRing; ri++) {
+    for (let si = 0; si < nSeg; si++) {
+      tris.push(grid[ri][si], grid[ri+1][si+1], grid[ri][si+1]);
+      tris.push(grid[ri][si], grid[ri+1][si],   grid[ri+1][si+1]);
+    }
+  }
+
+  // ── Annular top & bottom faces (hex outline minus bore circle) ─
+  // Point on hex perimeter at polar angle a
+  function hexBound(a) {
+    const norm = ((a % PI2) + PI2) % PI2;
+    const face = Math.floor(norm / (Math.PI/3));
+    const t    = Math.max(0, Math.min(1, (norm - face*Math.PI/3) / (Math.PI/3)));
+    const f1   = (face+1)%6;
+    return [hx(face)*(1-t)+hx(f1)*t, hz(face)*(1-t)+hz(f1)*t];
+  }
+  for (let si = 0; si < nSeg; si++) {
+    const a0=(si/nSeg)*PI2, a1=((si+1)/nSeg)*PI2;
+    const b0=[majorR*Math.cos(a0),0,majorR*Math.sin(a0)];
+    const b1=[majorR*Math.cos(a1),0,majorR*Math.sin(a1)];
+    const [h0x,h0z]=hexBound(a0), [h1x,h1z]=hexBound(a1);
+    const H0=[h0x,0,h0z], H1=[h1x,0,h1z];
+    // Bottom face (normal -Y)
+    tris.push(b0, H0, b1);
+    tris.push(H0, H1, b1);
+    // Top face (normal +Y) — reversed winding
+    const bt0=[majorR*Math.cos(a0),nutH,majorR*Math.sin(a0)];
+    const bt1=[majorR*Math.cos(a1),nutH,majorR*Math.sin(a1)];
+    const Ht0=[h0x,nutH,h0z], Ht1=[h1x,nutH,h1z];
+    tris.push(bt0, bt1, Ht0);
+    tris.push(Ht0, bt1, Ht1);
+  }
+
+  return trisToBuffers(tris);
+}
+
+function getFastenerParams() {
+  const size  = document.getElementById('f-size').value;
+  const type  = document.querySelector('input[name=ftype]:checked').value;
+  const tol   = parseFloat(document.getElementById('f-tol').value);
+  const res   = document.getElementById('f-res').value;
+  const m     = METRIC_THREADS[size];
+  const nSeg  = res === 'low' ? 24 : res === 'mid' ? 48 : 72;
+  const majorR    = m.d / 2;
+  const threadH   = m.pitch * 0.6;
+  const hexR      = m.af / (2 * Math.cos(Math.PI/6));
+
+  if (type === 'bolt') {
+    const shankLen = parseFloat(document.getElementById('f-len').value);
+    const nRing    = Math.max(6, Math.ceil((shankLen / m.pitch) * 14));
+    return { type, size, tol, pitch: m.pitch,
+      majorR: majorR - tol * 0.5,
+      minorR: majorR - threadH - tol * 0.5,
+      shankLen, headH: m.headH, hexR, nSeg, nRing };
+  } else {
+    const nutH = parseFloat(document.getElementById('f-nuth').value);
+    const nRing = Math.max(4, Math.ceil((nutH / m.pitch) * 14));
+    return { type, size, tol, pitch: m.pitch,
+      majorR: majorR + tol * 0.5,
+      minorR: majorR - threadH + tol * 0.5,
+      nutH, hexR, nSeg, nRing };
+  }
+}
+
+function rebuildFastener() {
+  if (appMode !== 'fastener') return;
+  const p = getFastenerParams();
+  const {pos, nor} = p.type === 'bolt' ? buildBoltGeometry(p) : buildNutGeometry(p);
+
+  stlPositions = new Float32Array(pos);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  geo.setAttribute('normal',   new THREE.BufferAttribute(new Float32Array(nor), 3));
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x64748b, roughness: 0.25, metalness: 0.5, side: THREE.DoubleSide,
+  });
+
+  if (fastenerMesh) { propGroup.remove(fastenerMesh); fastenerMesh.geometry.dispose(); fastenerMesh.material.dispose(); }
+  if (propMesh)  propMesh.visible  = false;
+  if (hubMesh)   hubMesh.visible   = false;
+  if (thrustArrow) thrustArrow.visible = false;
+  fastenerMesh = new THREE.Mesh(geo, mat);
+  propGroup.add(fastenerMesh);
+
+  const triCount = pos.length / 9;
+  document.getElementById('s-tris').textContent    = triCount.toLocaleString();
+  document.getElementById('vp-corner').textContent = triCount.toLocaleString() + ' triangles';
+  const m = METRIC_THREADS[p.size];
+  document.getElementById('s-diam').textContent  = p.size;
+  document.getElementById('s-pitch').textContent = m.pitch + ' mm';
+
+  // Thread info panel
+  const minorD  = (m.d - m.pitch * 1.2269).toFixed(2);
+  const boltMaj = (m.d - p.tol * 0.5).toFixed(2);
+  const nutMin  = (m.d - m.pitch * 1.2269 + p.tol * 0.5).toFixed(2);
+  document.getElementById('f-info').innerHTML = `
+    <div class="f-info-row"><span>Nominal Ø</span><strong>${m.d} mm</strong></div>
+    <div class="f-info-row"><span>Pitch</span><strong>${m.pitch} mm</strong></div>
+    <div class="f-info-row"><span>Hex AF</span><strong>${m.af} mm</strong></div>
+    <div class="f-info-row"><span>Bolt major Ø</span><strong>${boltMaj} mm</strong></div>
+    <div class="f-info-row"><span>Nut minor Ø</span><strong>${nutMin} mm</strong></div>
+    <div class="f-info-row"><span>Clearance</span><strong>${p.tol} mm/side</strong></div>`;
+
+  if (!cameraLocked) {
+    const box  = new THREE.Box3().setFromObject(propGroup);
+    const size = box.getSize(new THREE.Vector3()).length();
+    const ctr  = box.getCenter(new THREE.Vector3());
+    const dir  = camera.position.clone().sub(controls.target).normalize();
+    controls.target.copy(ctr);
+    camera.position.copy(ctr).addScaledVector(dir, size * 2.2);
+    controls.update();
+  }
+}
+
+function switchTool(mode) {
+  appMode = mode;
+  document.getElementById('tab-prop').classList.toggle('tool-tab-active',     mode === 'prop');
+  document.getElementById('tab-fastener').classList.toggle('tool-tab-active', mode === 'fastener');
+  document.getElementById('prop-panel').style.display      = mode === 'prop'      ? '' : 'none';
+  document.getElementById('fastener-panel').style.display  = mode === 'fastener'  ? '' : 'none';
+  ['btn-sim','btn-spin-dir'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = mode === 'prop' ? '' : 'none';
+  });
+  if (mode !== 'prop' && simulating) toggleSim();
+  if (mode === 'prop') {
+    if (fastenerMesh) fastenerMesh.visible = false;
+    if (propMesh)  propMesh.visible  = true;
+    if (hubMesh)   hubMesh.visible   = true;
+    cameraLocked = false;
+    rebuild();
+  } else {
+    cameraLocked = false;
+    rebuildFastener();
+  }
+}
+
+function onFTypeChange() {
+  const isBolt = document.querySelector('input[name=ftype]:checked').value === 'bolt';
+  document.getElementById('f-bolt-rows').style.display = isBolt ? '' : 'none';
+  document.getElementById('f-nut-rows').style.display  = isBolt ? 'none' : '';
+}
+
+function onFSizeChange() {
+  const size = document.getElementById('f-size').value;
+  const m    = METRIC_THREADS[size];
+  // Update nut height to standard for the new size
+  document.getElementById('f-nuth').value  = m.nutH;
+  document.getElementById('fn-nuth').value = m.nutH;
+  document.getElementById('v-fnuth').textContent = m.nutH.toFixed(1);
+}
+
+// Fastener slider sync helpers
+function fsync(key) {
+  const s = document.getElementById('f-' + key);
+  const n = document.getElementById('fn-' + key);
+  const v = document.getElementById('v-f' + key);
+  if (n) n.value = s.value;
+  if (v) v.textContent = s.value;
+}
+function fsyncF(key, dec) {
+  const s = document.getElementById('f-' + key);
+  const n = document.getElementById('fn-' + key);
+  const v = document.getElementById('v-f' + key);
+  const val = parseFloat(s.value).toFixed(dec);
+  if (n) n.value = val;
+  if (v) v.textContent = val;
+}
+function fsyncR(key) {
+  const s = document.getElementById('f-' + key);
+  const n = document.getElementById('fn-' + key);
+  if (s && n) s.value = n.value;
+  fsync(key);
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  THREE.JS SCENE
 // ═══════════════════════════════════════════════════════════════
 let renderer, scene, camera, controls, propMesh, hubMesh;
@@ -990,10 +1391,12 @@ let stlPositions = null;   // saved for STL export
 let cameraLocked = false;  // true after first user orbit — disables auto-fit
 let propGroup = null;   // Three.js Group — contains propMesh + hubMesh so we can spin them
 let thrustArrow = null; // ArrowHelper pointing in thrust direction
-let simulating  = false;
-let propCW      = false;  // updated by rebuild(), read by animation loop
-let spinCW      = false;  // animation spin direction only — independent of blade geometry
-let lastParams  = null;   // latest params, used by updateSim()
+let simulating    = false;
+let propCW        = false;  // updated by rebuild(), read by animation loop
+let spinCW        = false;  // animation spin direction only — independent of blade geometry
+let lastParams    = null;   // latest params, used by updateSim()
+let appMode       = 'prop'; // 'prop' | 'fastener'
+let fastenerMesh  = null;
 
 function initThree() {
   const canvas = document.getElementById('canvas');
@@ -1112,6 +1515,7 @@ function getParams() {
 }
 
 function rebuild() {
+  if (appMode !== 'prop') return;
   const p = getParams();
 
   // Update labels
@@ -1282,10 +1686,15 @@ function exportSTL() {
     dv.setUint16(off, 0, true); off += 2;
   }
 
-  const p    = getParams();
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' }));
-  a.download = `prop_${p.diam}x${p.pitch}_${p.blades}blade.stl`;
+  if (appMode === 'fastener') {
+    const fp = getFastenerParams();
+    a.download = `${fp.size}_${fp.type}_tol${fp.tol}.stl`;
+  } else {
+    const p = getParams();
+    a.download = `prop_${p.diam}x${p.pitch}_${p.blades}blade.stl`;
+  }
   a.click();
   URL.revokeObjectURL(a.href);
 }
