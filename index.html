@@ -733,10 +733,28 @@
       <div class="group">
         <div class="group-title">Print Tolerance</div>
         <div class="row">
+          <div class="row-lbl">Preset</div>
+          <select id="f-tol-preset" onchange="applyTolPreset()">
+            <option value="0.10">Tight — 0.10 mm (resin/high-end FDM)</option>
+            <option value="0.15">Snug — 0.15 mm (dialled-in FDM)</option>
+            <option value="0.20" selected>Standard — 0.20 mm (most FDM)</option>
+            <option value="0.25">Loose — 0.25 mm (flexible/worn nozzle)</option>
+            <option value="0.30">Sloppy — 0.30 mm (draft / TPU)</option>
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+        <div class="row" id="f-tol-custom-row" style="display:none">
           <div class="row-lbl">Clearance <span class="v" id="v-ftol">0.20</span> mm</div>
           <div class="row-in">
-            <input type="range"  id="f-tol"  min="0" max="0.5" value="0.2" step="0.01"  oninput="fsyncF('tol',2);rebuildFastener()">
-            <input type="number" id="fn-tol" value="0.2" min="0" max="0.5" step="0.01"  onchange="fsyncR('tol');rebuildFastener()">
+            <input type="range"  id="f-tol"  min="0" max="0.6" value="0.2" step="0.01"  oninput="fsyncF('tol',2);rebuildFastener()">
+            <input type="number" id="fn-tol" value="0.2" min="0" max="0.6" step="0.01"  onchange="fsyncR('tol');rebuildFastener()">
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-lbl">Thread Hand</div>
+          <div class="radio-row">
+            <input type="radio" name="fhand" id="fhand-rh" value="rh" checked onchange="rebuildFastener()"><label for="fhand-rh">Right (standard)</label>
+            <input type="radio" name="fhand" id="fhand-lh" value="lh"         onchange="rebuildFastener()"><label for="fhand-lh">Left (reverse)</label>
           </div>
         </div>
         <div class="row">
@@ -1157,11 +1175,12 @@ function trisToBuffers(tris) {
 }
 
 /** Bolt: hex-head (optional) + externally threaded shank. Y=0 is shank tip. */
-function buildBoltGeometry({majorR, minorR, pitch, shankLen, headH, hexR, nSeg, nRing, headStyle}) {
+function buildBoltGeometry({majorR, minorR, pitch, shankLen, headH, hexR, nSeg, nRing, headStyle, lh}) {
   const tris = [];
   const PI2 = Math.PI * 2;
 
   // ── Externally threaded shank ────────────────────────────────
+  const sign = lh ? -1 : 1;
   const grid = [];
   for (let ri = 0; ri <= nRing; ri++) {
     const y = (ri / nRing) * shankLen;
@@ -1171,7 +1190,7 @@ function buildBoltGeometry({majorR, minorR, pitch, shankLen, headH, hexR, nSeg, 
       const v = (si / nSeg) * PI2;
       let r = majorR;
       if (!isEdge) {
-        const phi = (y / pitch) - (si / nSeg);
+        const phi = (y / pitch) - sign * (si / nSeg);
         const t   = Math.abs(((phi % 1) + 1) % 1 - 0.5) * 2;
         r = minorR + t * (majorR - minorR);
       }
@@ -1221,9 +1240,10 @@ function buildBoltGeometry({majorR, minorR, pitch, shankLen, headH, hexR, nSeg, 
 }
 
 /** Nut: hex prism with internally threaded bore. Y=0 bottom, Y=nutH top. */
-function buildNutGeometry({majorR, minorR, pitch, nutH, hexR, nSeg}) {
+function buildNutGeometry({majorR, minorR, pitch, nutH, hexR, nSeg, lh}) {
   const tris = [];
   const PI2 = Math.PI * 2;
+  const sign = lh ? -1 : 1;
   const hx = i => hexR * Math.cos(i * Math.PI/3 + Math.PI/6);
   const hz = i => hexR * Math.sin(i * Math.PI/3 + Math.PI/6);
 
@@ -1245,7 +1265,7 @@ function buildNutGeometry({majorR, minorR, pitch, nutH, hexR, nSeg}) {
       const v = (si / nSeg) * PI2;
       let r = majorR;
       if (!isEdge) {
-        const phi = (y / pitch) - (si / nSeg);
+        const phi = (y / pitch) - sign * (si / nSeg);
         const t   = Math.abs(((phi % 1) + 1) % 1 - 0.5) * 2;
         r = majorR - t * (majorR - minorR);
       }
@@ -1290,10 +1310,28 @@ function buildNutGeometry({majorR, minorR, pitch, nutH, hexR, nSeg}) {
   return trisToBuffers(tris);
 }
 
+function applyTolPreset() {
+  const sel = document.getElementById('f-tol-preset').value;
+  const customRow = document.getElementById('f-tol-custom-row');
+  if (sel === 'custom') {
+    customRow.style.display = '';
+  } else {
+    customRow.style.display = 'none';
+    document.getElementById('f-tol').value  = sel;
+    document.getElementById('fn-tol').value = sel;
+    document.getElementById('v-ftol').textContent = parseFloat(sel).toFixed(2);
+  }
+  rebuildFastener();
+}
+
 function getFastenerParams() {
   const size  = document.getElementById('f-size').value;
   const type  = document.querySelector('input[name=ftype]:checked').value;
-  const tol   = parseFloat(document.getElementById('f-tol').value);
+  const preset = document.getElementById('f-tol-preset').value;
+  const tol   = preset === 'custom'
+    ? parseFloat(document.getElementById('f-tol').value)
+    : parseFloat(preset);
+  const lh    = document.querySelector('input[name=fhand]:checked').value === 'lh';
   const res   = document.getElementById('f-res').value;
   const m     = METRIC_THREADS[size];
   const nSeg  = res === 'low' ? 24 : res === 'mid' ? 48 : 72;
@@ -1305,14 +1343,14 @@ function getFastenerParams() {
     const shankLen  = parseFloat(document.getElementById('f-len').value);
     const headStyle = document.querySelector('input[name=fhead]:checked').value;
     const nRing     = Math.max(6, Math.ceil((shankLen / m.pitch) * 14));
-    return { type, size, tol, pitch: m.pitch, headStyle,
+    return { type, size, tol, lh, pitch: m.pitch, headStyle,
       majorR: majorR - tol * 0.5,
       minorR: majorR - threadH - tol * 0.5,
       shankLen, headH: m.headH, hexR, nSeg, nRing };
   } else {
     const nutH = parseFloat(document.getElementById('f-nuth').value);
     const nRing = Math.max(4, Math.ceil((nutH / m.pitch) * 14));
-    return { type, size, tol, pitch: m.pitch,
+    return { type, size, tol, lh, pitch: m.pitch,
       majorR: majorR + tol * 0.5,
       minorR: majorR - threadH + tol * 0.5,
       nutH, hexR, nSeg, nRing };
@@ -1357,7 +1395,8 @@ function rebuildFastener() {
     <div class="f-info-row"><span>Hex AF</span><strong>${m.af} mm</strong></div>
     <div class="f-info-row"><span>Bolt major Ø</span><strong>${boltMaj} mm</strong></div>
     <div class="f-info-row"><span>Nut minor Ø</span><strong>${nutMin} mm</strong></div>
-    <div class="f-info-row"><span>Clearance</span><strong>${p.tol} mm/side</strong></div>`;
+    <div class="f-info-row"><span>Clearance</span><strong>${p.tol} mm/side</strong></div>
+    <div class="f-info-row"><span>Thread Hand</span><strong>${p.lh ? 'Left (reverse)' : 'Right (standard)'}</strong></div>`;
 
   if (!cameraLocked) {
     const box  = new THREE.Box3().setFromObject(propGroup);
