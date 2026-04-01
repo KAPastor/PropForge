@@ -296,7 +296,8 @@
     .tool-tab.tool-tab-active { background:var(--blue); color:#fff; border-color:var(--blue); }
     .tool-tab:hover:not(.tool-tab-active) { background:#e2e8f0; color:var(--text); }
     /* Fastener info */
-    .f-info-row { display:flex; justify-content:space-between; padding:1px 0; }
+    .f-info-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border); }
+    .f-info-row:last-child { border-bottom:none; }
     .f-info-row strong { color:var(--text); }
   </style>
   <!-- Vercel Analytics -->
@@ -716,7 +717,7 @@
 
       <div class="group">
         <div class="group-title">Thread Info</div>
-        <div id="f-info" style="font-size:.8rem;line-height:1.8;color:var(--muted)">—</div>
+        <div id="f-info" style="font-size:.8rem;color:var(--muted);padding:4px 14px 10px">—</div>
       </div>
 
     </div><!-- /fastener-panel -->
