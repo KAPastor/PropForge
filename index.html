@@ -735,19 +735,37 @@
         <div class="row">
           <div class="row-lbl">Preset</div>
           <select id="f-tol-preset" onchange="applyTolPreset()">
-            <option value="0.10">Tight — 0.10 mm (resin/high-end FDM)</option>
-            <option value="0.15">Snug — 0.15 mm (dialled-in FDM)</option>
-            <option value="0.20" selected>Standard — 0.20 mm (most FDM)</option>
-            <option value="0.25">Loose — 0.25 mm (flexible/worn nozzle)</option>
-            <option value="0.30">Sloppy — 0.30 mm (draft / TPU)</option>
-            <option value="custom">Custom…</option>
+            <optgroup label="— Resin / SLA / SLS —">
+              <option value="0.05">Press fit — 0.05 mm</option>
+              <option value="0.08">Tight — 0.08 mm</option>
+              <option value="0.10">Snug — 0.10 mm</option>
+              <option value="0.12">Standard — 0.12 mm</option>
+            </optgroup>
+            <optgroup label="— FDM / FFF Dialled-in —">
+              <option value="0.15">Tight — 0.15 mm</option>
+              <option value="0.18">Snug — 0.18 mm</option>
+              <option value="0.20" selected>Standard — 0.20 mm ✓ recommended</option>
+              <option value="0.22">Easy — 0.22 mm</option>
+              <option value="0.25">Loose — 0.25 mm</option>
+            </optgroup>
+            <optgroup label="— FDM Draft / Flexible —">
+              <option value="0.28">Loose — 0.28 mm</option>
+              <option value="0.30">Sloppy — 0.30 mm</option>
+              <option value="0.35">Very loose — 0.35 mm (TPU)</option>
+              <option value="0.40">Draft — 0.40 mm</option>
+              <option value="0.50">Max clearance — 0.50 mm</option>
+            </optgroup>
+            <optgroup label="— Special —">
+              <option value="0.00">Zero — 0.00 mm (model only / no fit)</option>
+              <option value="custom">Custom…</option>
+            </optgroup>
           </select>
         </div>
         <div class="row" id="f-tol-custom-row" style="display:none">
           <div class="row-lbl">Clearance <span class="v" id="v-ftol">0.20</span> mm</div>
           <div class="row-in">
-            <input type="range"  id="f-tol"  min="0" max="0.6" value="0.2" step="0.01"  oninput="fsyncF('tol',2);rebuildFastener()">
-            <input type="number" id="fn-tol" value="0.2" min="0" max="0.6" step="0.01"  onchange="fsyncR('tol');rebuildFastener()">
+            <input type="range"  id="f-tol"  min="0" max="0.8" value="0.2" step="0.01"  oninput="fsyncF('tol',2);rebuildFastener()">
+            <input type="number" id="fn-tol" value="0.2" min="0" max="0.8" step="0.01"  onchange="fsyncR('tol');rebuildFastener()">
           </div>
         </div>
         <div class="row">
