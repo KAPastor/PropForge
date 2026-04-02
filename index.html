@@ -1272,21 +1272,17 @@ function buildNutGeometry({majorR, minorR, pitch, nutH, hexR, nSeg, lh}) {
     tris.push([hx(f1),0,hz(f1)], [hx(f),nutH,hz(f)], [hx(f1),nutH,hz(f1)]);
   }
 
-  // ── Internal threaded bore ───────────────────────────────────
+  // ── Internal threaded bore (threads run fully to both faces) ───
   const nRing = Math.max(4, Math.ceil((nutH / pitch) * 16));
   const grid = [];
   for (let ri = 0; ri <= nRing; ri++) {
     const y = (ri / nRing) * nutH;
     const row = [];
-    const isEdge = ri === 0 || ri === nRing;
     for (let si = 0; si <= nSeg; si++) {
       const v = (si / nSeg) * PI2;
-      let r = majorR;
-      if (!isEdge) {
-        const phi = (y / pitch) - sign * (si / nSeg);
-        const t   = Math.abs(((phi % 1) + 1) % 1 - 0.5) * 2;
-        r = majorR - t * (majorR - minorR);
-      }
+      const phi = (y / pitch) - sign * (si / nSeg);
+      const t   = Math.abs(((phi % 1) + 1) % 1 - 0.5) * 2;
+      const r   = majorR - t * (majorR - minorR);
       row.push([r * Math.cos(v), y, r * Math.sin(v)]);
     }
     grid.push(row);
@@ -1299,7 +1295,7 @@ function buildNutGeometry({majorR, minorR, pitch, nutH, hexR, nSeg, lh}) {
     }
   }
 
-  // ── Annular top & bottom faces (hex outline minus bore circle) ─
+  // ── Annular top & bottom faces — seam to actual thread profile ─
   // Point on hex perimeter at polar angle a
   function hexBound(a) {
     const norm = ((a % PI2) + PI2) % PI2;
@@ -1310,16 +1306,17 @@ function buildNutGeometry({majorR, minorR, pitch, nutH, hexR, nSeg, lh}) {
   }
   for (let si = 0; si < nSeg; si++) {
     const a0=(si/nSeg)*PI2, a1=((si+1)/nSeg)*PI2;
-    const b0=[majorR*Math.cos(a0),0,majorR*Math.sin(a0)];
-    const b1=[majorR*Math.cos(a1),0,majorR*Math.sin(a1)];
+    // Use actual grid edge positions so annular face matches thread profile
+    const b0 = [grid[0][si][0],    0, grid[0][si][2]];
+    const b1 = [grid[0][si+1][0],  0, grid[0][si+1][2]];
     const [h0x,h0z]=hexBound(a0), [h1x,h1z]=hexBound(a1);
     const H0=[h0x,0,h0z], H1=[h1x,0,h1z];
     // Bottom face (normal -Y)
     tris.push(b0, H0, b1);
     tris.push(H0, H1, b1);
-    // Top face (normal +Y) — reversed winding
-    const bt0=[majorR*Math.cos(a0),nutH,majorR*Math.sin(a0)];
-    const bt1=[majorR*Math.cos(a1),nutH,majorR*Math.sin(a1)];
+    // Top face — use actual top grid edge
+    const bt0 = [grid[nRing][si][0],   nutH, grid[nRing][si][2]];
+    const bt1 = [grid[nRing][si+1][0], nutH, grid[nRing][si+1][2]];
     const Ht0=[h0x,nutH,h0z], Ht1=[h1x,nutH,h1z];
     tris.push(bt0, bt1, Ht0);
     tris.push(Ht0, bt1, Ht1);
